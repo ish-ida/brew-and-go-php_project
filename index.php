@@ -1,106 +1,186 @@
 <?php
-    require "Autoload.php";
+require "Autoload.php";
+session_start();
 
-  $items = [  
-        new Item("Iced Mocchaccino", 150),
-        new Item("Espresso", 120),
-        new Item("Cappuccino", 130),
-        new Item("Latte", 140),
-        new Item("Black Americano", 160)
+
+
+// Initialize items and cart in session
+if (!isset($_SESSION['items'])) {
+    $_SESSION['items'] = [
+        new Item("Iced Mochaccino", 150, "Iced Specials"),
+        new Item("Espresso", 120, "Espresso"),
+        new Item("Cappuccino", 130, "Hot Classic"),
+        new Item("Latte", 140, "Iced Specials"),
+        new Item("Black Americano", 160, "Hot Classic"),
+        new Item("Strawberry Milkshake", 180, "Milkshake"),
+        new Item("Chocolate Milkshake", 170, "Milkshake"),
+        new Item("Vanilla Frappe", 190, "Frapped"),
+        new Item("Blueberry Frappe", 190, "Frapped"),
     ];
+}
 
-    $cart = new Cart();
-    $billing = new Billing();
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = new Cart();
+}
 
-    function menu() {
-        echo "\n=============================\n";
-        echo "   ORDER & BILLING SYSTEM\n";
-        echo "=============================\n";
-        echo "1. View Items\n";
-        echo "2. Purchase Item\n";
-        echo "3. View Cart\n";
-        echo "4. Checkout\n";
-        echo "5. Exit\n";
-        echo "Choose an option: ";
-    }
+if (!isset($_SESSION['billing'])) {
+    $_SESSION['billing'] = new Billing();
+}
 
-    while (true) {
-        menu();
-    $choice = trim(fgets(STDIN));
+$items = $_SESSION['items'];
+$cart = $_SESSION['cart'];
+$billing = $_SESSION['billing'];
 
+// Handle actions
+$error = '';
+$success = '';
+
+$selectedCategory = $_GET['category'] ?? 'All Items';
+
+// Filter items by category
+if ($selectedCategory !== 'All Items') {
+    $filteredItems = array_filter($items, function($item) use ($selectedCategory) {
+        return $item->getCategory() === $selectedCategory;
+    });
+    $filteredItems = array_values($filteredItems); // Re-index the array
+} else {
+    $filteredItems = $items;
+}
+
+// Replace $items with filtered items for display
+$items = $filteredItems;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if($choice == 1){ // view
-            echo "\n======= AVAILABLE ITEMS =======\n";
-            foreach($items as $i => $itm){
-                echo ($i+1).". {$itm->info()}\n";
-            }
-        }
-
-        else if($choice == 2){ // purchase
-            echo "Enter item number: ";
-            $num = trim(fgets(STDIN)) - 1;
-
-            if(!isset($items[$num])){
+        // Add to cart
+        if (isset($_POST['add_to_cart'])) {
+            $itemIndex = $_POST['item_index'];
+            $qty = $_POST['quantity'] ?? 1;
+            
+            if (!isset($items[$itemIndex])) {
                 throw new Exception("Item does not exist.");
             }
-
-            echo "Enter quantity: ";
-            $qty = trim(fgets(STDIN));
-
-            if(!$items[$num]->reduceStock($qty)){
+            
+            if (!$items[$itemIndex]->reduceStock($qty)) {
                 throw new Exception("Not enough stock.");
             }
-
-            $cart->add($items[$num], $qty);
-            echo "Added to cart!\n";
+            
+            $cart->add($items[$itemIndex], $qty);
+            $success = "Item added to cart!";
         }
 
-        else if($choice == 3){ // view cart
-            echo "\n=========== CART ===========\n";
-            if($cart->isEmpty()){
-                echo "Cart is empty.\n";
-            } else {
-                foreach($cart->getItems() as $ci){
-                    echo $ci->getItem()->getName()
-                       ." x ".$ci->getQty()
-                       ." = ₱".$ci->total()."\n";
-                }
-                echo "TOTAL: ₱".$cart->subtotal()."\n";
+        // Remove from cart
+if (isset($_POST['remove_from_cart'])) {
+    $cartIndex = $_POST['cart_index'];
+    
+    $removedCartItem = $cart->removeItem($cartIndex);
+    
+    if ($removedCartItem) {
+        // Find the item in the items array and restore stock
+        $itemName = $removedCartItem->getItem()->getName();
+        foreach ($items as $item) {
+            if ($item->getName() === $itemName) {
+                $item->restoreStock($removedCartItem->getQty());
+                break;
             }
         }
+        $success = "Item removed from cart and stock restored!";
+    } else {
+        $error = "Failed to remove item.";
+    }
+}
 
-        else if($choice == 4){ // checkout
-            echo "Enter cash amount: ";
-            $cash = trim(fgets(STDIN));
+    // Update cart quantity
+if (isset($_POST['update_cart_quantity'])) {
+    $cartIndex = $_POST['cart_index'];
+    $newQty = $_POST['new_quantity'];
+    
+    $updateResult = $cart->updateQuantity($cartIndex, $newQty);
+    
+    if ($updateResult) {
+        $oldQty = $updateResult['old'];
+        $newQty = $updateResult['new'];
+        $item = $updateResult['item'];
+        
+        // Calculate stock difference
+        $difference = $newQty - $oldQty;
+        
+        // Find the item in items array and adjust stock
+        foreach ($items as $i) {
+            if ($i->getName() === $item->getName()) {
+                if ($difference > 0) {
+                    // Increasing quantity - reduce stock
+                    if (!$i->reduceStock($difference)) {
+                        throw new Exception("Not enough stock available.");
+                    }
+                } else if ($difference < 0) {
+                    // Decreasing quantity - restore stock
+                    $i->restoreStock(abs($difference));
+                }
+                break;
+            }
+        }
+        
+        $success = "Cart quantity updated!";
+    } else {
+        $error = "Failed to update quantity.";
+    }
+}
 
+
+        
+        // Checkout
+        if (isset($_POST['checkout'])) {
+            $cash = $_POST['cash'];
+            
             $result = $billing->checkout($cart, $cash);
-
-            echo "\nCHECKOUT SUMMARY\n";
-            echo "Subtotal: ₱".$result["subtotal"]."\n";
-            echo "Tax (12%): ₱".$result["tax"]."\n";
-            echo "TOTAL: ₱".$result["total"]."\n";
-            echo "Change: ₱".$result["change"]."\n";
-            echo "Thank you for your purchase!\n";
+            
+            // Save receipt to file
+            $receiptData = date('Y-m-d H:i:s') . "\n";
+            $receiptData .= "Subtotal: ₱" . $result['subtotal'] . "\n";
+            $receiptData .= "Tax (12%): ₱" . $result['tax'] . "\n";
+            $receiptData .= "Total: ₱" . $result['total'] . "\n";
+            $receiptData .= "Cash: ₱" . $cash . "\n";
+            $receiptData .= "Change: ₱" . $result['change'] . "\n";
+            $receiptData .= "----------------------------\n\n";
+            
+            file_put_contents('receipts.txt', $receiptData, FILE_APPEND);
+            
+            $_SESSION['checkout_result'] = $result;
+            header('Location: index.php?page=success');
+            exit;
         }
+        
+    } catch (InsufficientCashException $e) {
+        $error = $e->getMessage();
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
+}
 
-        else if($choice == 5){
-            exit("Thank You Ma'am/Sir, Come Again!\n");
-        }
+// Routing
+$page = $_GET['page'] ?? 'home';
 
-        else {
-            echo "Invalid option.\n";
-        }
-    }
+include 'header.php';
 
-    catch(InsufficientCashException $e){
-        echo "Error: ".$e->getMessage()."\n";
-    }
-    catch(Exception $e){
-        echo "Error: ".$e->getMessage()."\n";
-    }
-    finally {
-        echo "Press Enter to continue...";
-        fgets(STDIN);
-      }
-    }
+switch ($page) {
+     case 'menu':
+        include 'menu.php';
+        break;
+
+    case 'cart':
+        include 'cartpage.php';
+        break;
+    case 'checkout':
+        include 'checkout.php';
+        break;
+    case 'success':
+        include 'success.php';
+        break;
+    default:
+        include 'hero.php';
+        break;
+}
+
+include 'footer.php';
 ?>

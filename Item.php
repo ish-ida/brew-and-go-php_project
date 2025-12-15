@@ -25,6 +25,17 @@ abstract class BaseProduct {
 
     class Item extends BaseProduct {
         protected $stock = 100;
+        protected $category;
+
+        public function __construct($name, $price, $category = "All Items") { // Add category parameter
+        parent::__construct($name, $price);
+        $this->category = $category; // Set category
+    }
+
+    // Add this getter method
+    public function getCategory() {
+        return $this->category;
+    }
 
         public function __get($prop) {
             return $this->$prop ?? null;
@@ -41,6 +52,11 @@ abstract class BaseProduct {
             }
             return false;
         }
+
+        public function restoreStock($qty) {
+    $this->stock += $qty;
+    return true;
+}
     }
 
 ?>

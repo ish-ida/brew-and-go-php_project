@@ -1,0 +1,181 @@
+Complete System Flow:
+1. Landing/Home Page (hero.php)
+
+User visits localhost:3000/index.php or just index.php
+Sees hero section with:
+
+"Explore Drinks" heading
+Carousel showing drink categories (auto-rotates every 4 seconds)
+Left/Right arrows to manually browse categories
+Big "Order Now" button
+
+
+User clicks "Order Now" → Goes to Menu Page
+
+
+2. Menu Page (menu.php)
+
+Shows all available coffee items with:
+
+Left sidebar with categories (All Items, Hot Classic, Iced Specials, etc.)
+Product cards displaying:
+
+Coffee icon
+Item name and price
+Current stock available
+Description
+Quantity selector
+"Add to Cart" button
+
+
+
+
+User can:
+
+Filter by category - Click sidebar categories to show only items in that category
+Select quantity - Choose how many of each item
+Add to cart - Click "Add to Cart" button
+
+
+When item is added:
+
+Stock is reduced by the quantity ordered
+Item is added to cart
+Cart badge in navbar updates showing item count
+Success message appears: "Item added to cart!"
+
+
+
+
+3. Cart Page (cartpage.php)
+
+User clicks "Cart" in navigation or cart icon
+If cart is empty:
+
+Shows empty cart message
+"Browse Menu" button to go back
+
+
+If cart has items, shows:
+
+Cart Items Section:
+
+Each item with icon, name, price, quantity, and total
+Trash icon button to remove item
+
+
+Order Summary Section:
+
+Subtotal
+Tax (12%)
+Grand Total
+
+
+Action Buttons:
+
+"Continue Shopping" - Goes back to menu
+"Proceed to Checkout" - Goes to checkout page
+
+
+
+
+User can:
+
+Remove items - Click trash icon (stock is restored)
+Continue shopping or proceed to checkout
+
+
+
+
+4. Checkout Page (checkout.php)
+
+If cart is empty, redirects to menu
+Shows:
+
+Order Items Section:
+
+List of all items with quantities and prices
+Subtotal, Tax, and Total Amount
+
+
+Payment Details Section:
+
+Cash amount input field
+Minimum amount required (total with tax)
+"Back to Cart" button
+"Complete Payment" button
+
+
+
+
+User enters cash amount and clicks "Complete Payment"
+System validates:
+
+If cash < total → Error: "Insufficient cash provided"
+If cash >= total → Process checkout
+
+
+
+
+5. Checkout Processing (index.php)
+When checkout is successful:
+
+Calculates subtotal, tax, total, and change
+Clears the cart
+Saves receipt to receipts.txt file with:
+
+Date and time
+Subtotal, Tax, Total
+Cash paid and Change
+
+
+Stores result in session
+Redirects to success page
+
+
+6. Success Page (success.php)
+
+Shows animated success message with:
+
+Green checkmark icon (with rotation animation)
+"Payment Successful!" message
+"Thank you for your purchase!"
+Receipt display:
+
+Subtotal
+Tax (12%)
+Total
+Change returned
+
+
+"Back to Menu" button
+
+
+Receipt is automatically cleared from session
+User clicks "Back to Menu" → Returns to menu page to start over
+
+
+Background Processes:
+Session Management:
+
+Items - Stored in $_SESSION['items'] with stock tracking
+Cart - Stored in $_SESSION['cart'] persists across pages
+Billing - Stored in $_SESSION['billing']
+
+Stock Management:
+
+Each item starts with 100 stock
+Stock reduces when items are added to cart
+Stock restores when items are removed from cart
+Prevents ordering more than available stock
+
+File Storage:
+
+receipts.txt - Appends each transaction receipt with timestamp
+
+Error Handling:
+
+Cart empty validation
+Stock availability checks
+Insufficient cash validation
+Custom InsufficientCashException for payment errors
